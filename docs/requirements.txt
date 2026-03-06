@@ -2,7 +2,7 @@
 canonical-sphinx>=0.5.1
 
 # Pin Sphinx to avoid resolution issues with incompatible extensions
-Sphinx>=7.4.0,<9
+Sphinx>=9.1,<10
 
 # Extensions previously auto-loaded by canonical-sphinx
 myst-parser>=3.0.0
