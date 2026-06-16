@@ -131,6 +131,7 @@ class Dep3FieldDefinition:
         names: List of field names (first is primary, rest are aliases)
         required: Whether at least one of the names must be present
         requires_content: Whether the field must have non-empty content
+        allow_multiline: Whether the field value can span multiple lines
         validator: Optional function to validate the field value
         error_code: ErrorCode to use when validation fails
         error_message: Error message template for validation failures
@@ -140,6 +141,7 @@ class Dep3FieldDefinition:
     names: list[str]
     required: bool
     requires_content: bool = False
+    allow_multiline: bool = False
     validator: Callable[[str], bool] | None = None
     error_code: ErrorCode | None = None
     error_message: str | None = None
@@ -153,6 +155,7 @@ DEP3_FIELD_DEFINITIONS = [
         names=["description", "subject"],
         required=True,
         requires_content=True,
+        allow_multiline=True,
         error_code=ErrorCode.PATCH_DEP3_MISSING_DESCRIPTION,
         error_message="Missing required Description/Subject field",
         severity=Severity.ERROR,
@@ -162,16 +165,19 @@ DEP3_FIELD_DEFINITIONS = [
         names=["origin"],
         required=False,  # Required as group with Author/From
         requires_content=False,
+        allow_multiline=False,
     ),
     Dep3FieldDefinition(
         names=["author", "from"],
         required=False,  # Required as group with Origin
         requires_content=False,
+        allow_multiline=False,
     ),
     # Optional fields with validation
     Dep3FieldDefinition(
         names=["last-update"],
         required=False,
+        allow_multiline=False,
         validator=_is_valid_date,
         error_code=ErrorCode.PATCH_DEP3_INVALID_DATE,
         error_message="Last-Update field must be a valid ISO date (YYYY-MM-DD)",
@@ -180,10 +186,17 @@ DEP3_FIELD_DEFINITIONS = [
     Dep3FieldDefinition(
         names=["forwarded"],
         required=False,
+        allow_multiline=False,
         validator=_validate_forwarded,
         error_code=ErrorCode.PATCH_DEP3_INVALID_FORWARDED,
         error_message='Forwarded field should be either "no", "not-needed" or a valid URL',
         severity=Severity.WARNING,
+    ),
+    Dep3FieldDefinition(
+        names=["bug", "bug-ubuntu", "bug-debian"],
+        required=False,
+        requires_content=True,
+        allow_multiline=False,
     ),
 ]
 
@@ -224,7 +237,7 @@ class Dep3HeaderParser:
         for raw_line, line_num in header_lines:
             line = _strip_comment_prefix(raw_line).rstrip("\r\n")
 
-            # Empty line resets parsing
+            # Empty line ends the current stanza
             if not line.strip():
                 if current_field:
                     fields[current_field] = (current_value, current_line)
@@ -247,15 +260,14 @@ class Dep3HeaderParser:
 
             # Continuation line (starts with space or tab)
             if current_field and line.startswith((" ", "\t")):
-                # Append to current value
                 current_value += "\n" + line.strip()
                 continue
 
-            # Non-continuation line resets field
+            # Unknown line that is not a field header and not a continuation:
+            # per DEP-3, such free-form text is appended to the current field
+            # value (typically the Subject body).
             if current_field:
-                fields[current_field] = (current_value, current_line)
-                current_field = None
-                current_value = ""
+                current_value += "\n" + line.strip()
 
         # Save final field if any
         if current_field:
@@ -353,8 +365,20 @@ def check_dep3_compliance(
 
         # Check content requirement and validation
         for field_name, (value, line_num) in found_fields:
-            # Check if field requires non-empty content
-            if field_def.requires_content and not value.strip():
+            if not field_def.allow_multiline and "\n" in value:
+                source_span = create_dep3_source_span(line_num)
+                feedback_items.append(
+                    FeedbackItem(
+                        message=f"The {field_name.capitalize()} field must be a single line",
+                        rule_id=ErrorCode.PATCH_DEP3_FORMAT,
+                        severity=field_def.severity,
+                        span=source_span,
+                    )
+                )
+
+            # Check if field requires non-empty content. The content must be on the
+            # first line (the text after the colon on the field-name line itself).
+            if field_def.requires_content and not value.split("\n")[0].strip():
                 source_span = create_dep3_source_span(line_num)
                 feedback_items.append(
                     FeedbackItem(
