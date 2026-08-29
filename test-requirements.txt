@@ -2,6 +2,6 @@
 # from upstream at https://github.com/canonical/se-tooling-ci-common.
 flake8==7.3.0
 flake8-import-order==0.19.2
-pylint==4.0.5
+pylint==4.0.8
 pytest
 poetry
