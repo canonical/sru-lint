@@ -290,6 +290,7 @@ class LaunchpadHelper:
             try:
                 # ESM publications report Release; archive names encode stream and full pocket.
                 archive_name = ppa.removeprefix("ppa:ubuntu-esm/esm-")
+                stream = f"{archive_name}?"
                 for pocket in ("security-staging", "updates-staging", "security", "updates"):
                     if archive_name.endswith(f"-{pocket}"):
                         stream = archive_name.removesuffix(f"-{pocket}")
