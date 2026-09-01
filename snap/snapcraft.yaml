@@ -28,6 +28,11 @@ apps:
       - network
       - desktop
       - password-manager-service
+  promadison:
+    command: bin/promadison
+    plugs:
+      - network
+      - password-manager-service
 
 adopt-info: sru-lint
 

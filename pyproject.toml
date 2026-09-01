@@ -38,6 +38,7 @@ mypy = "^1.15.0"
 [tool.poetry.scripts]
 sru-lint = "sru_lint.cli:app"
 check-all = "sru_lint._check_all:main"
+promadison = "sru_lint.promadison:app"
 
 [build-system]
 requires = ["poetry-core"]

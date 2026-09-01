@@ -6,6 +6,8 @@ Uses thread-local storage for connections (httplib2 is not thread-safe).
 
 import re
 import threading
+from collections.abc import Iterator
+from dataclasses import dataclass
 
 from debian.debian_support import Version
 from launchpadlib import uris
@@ -25,6 +27,16 @@ _distributions_lock = threading.Lock()
 # Shared cache for UCA pairings (series -> set of openstack release names)
 _uca_pairings_cache: dict[str, set[str]] | None = None
 _uca_pairings_lock = threading.Lock()
+
+
+@dataclass(frozen=True)
+class ProPublication:
+    """A source publication in an Ubuntu Pro stream and pocket."""
+
+    version: str
+    series: str
+    stream: str
+    pocket: str
 
 
 class LaunchpadHelper:
@@ -229,6 +241,18 @@ class LaunchpadHelper:
         owner, name = cleaned.split("/", 1)
         return owner, name
 
+    def _get_published_sources_in_ppa(self, ppa_reference: str, package_name: str):
+        """Return the published sources for ``package_name`` in a PPA."""
+        self._ensure_connection()
+        owner, name = self._parse_ppa_reference(ppa_reference)
+        self.logger.debug(f"Resolving PPA {owner}/{name}")
+        archive = _thread_local.launchpad.people[owner].getPPAByName(
+            distribution=_thread_local.ubuntu, name=name
+        )
+        return archive.getPublishedSources(
+            source_name=package_name, exact_match=True, status="Published"
+        )
+
     def get_highest_version_in_ppa(self, ppa_reference: str, package_name: str) -> str | None:
         """Return the highest published version of ``package_name`` in a PPA.
 
@@ -250,27 +274,37 @@ class LaunchpadHelper:
         Raises:
             ValueError: If ``ppa_reference`` is malformed.
         """
-        self._ensure_connection()
-        owner, name = self._parse_ppa_reference(ppa_reference)
-
-        self.logger.debug(f"Resolving PPA {owner}/{name}")
-        archive = _thread_local.launchpad.people[owner].getPPAByName(
-            distribution=_thread_local.ubuntu, name=name
-        )
-
-        publications = archive.getPublishedSources(
-            source_name=package_name,
-            exact_match=True,
-            status="Published",
-        )
+        publications = self._get_published_sources_in_ppa(ppa_reference, package_name)
         versions = [pub.source_package_version for pub in publications]
         if not versions:
-            self.logger.debug(f"No published versions of {package_name!r} in {owner}/{name}")
+            self.logger.debug(f"No published versions of {package_name!r} in {ppa_reference}")
             return None
 
         highest = max(versions, key=Version)
-        self.logger.debug(f"Highest version of {package_name!r} in {owner}/{name}: {highest}")
+        self.logger.debug(f"Highest version of {package_name!r} in {ppa_reference}: {highest}")
         return str(highest)
+
+    def get_pro_publications(self, package_name: str) -> Iterator[ProPublication]:
+        """Yield source publications for a Pro package."""
+        for ppa in self.PRO_PPAS:
+            try:
+                # ESM publications report Release; archive names encode stream and full pocket.
+                archive_name = ppa.removeprefix("ppa:ubuntu-esm/esm-")
+                for pocket in ("security-staging", "updates-staging", "security", "updates"):
+                    if archive_name.endswith(f"-{pocket}"):
+                        stream = archive_name.removesuffix(f"-{pocket}")
+                        break
+                yield from (
+                    ProPublication(
+                        publication.source_package_version,
+                        publication.distro_series.name,
+                        stream,
+                        pocket,
+                    )
+                    for publication in self._get_published_sources_in_ppa(ppa, package_name)
+                )
+            except Exception as error:
+                self.logger.warning(f"Skipping {ppa}: {type(error).__name__}: {error}")
 
     def get_bug(self, bug_number: int):
         """
