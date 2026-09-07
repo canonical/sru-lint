@@ -33,7 +33,7 @@ distro-info = "^1.0"
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.15.0"
 pre-commit = "^4.0.0"
-mypy = "^1.15.0"
+mypy = "^2.0.0"
 
 [tool.poetry.scripts]
 sru-lint = "sru_lint.cli:app"
