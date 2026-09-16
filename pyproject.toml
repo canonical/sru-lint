@@ -26,12 +26,12 @@ launchpadlib = "^2.1.0"
 coverage = "^7.10.7"
 parse = "^1.20.2"
 rich = "^14.2.0"
-ruff = "^0.15.0"
+ruff = "^0.16.0"
 keyring = "^25.7.0"
 distro-info = "^1.0"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.15.0"
+ruff = "^0.16.0"
 pre-commit = "^4.0.0"
 mypy = "^1.15.0"
 
