@@ -20,6 +20,7 @@ from sru_lint.common.launchpad_helper import get_launchpad_helper
 from sru_lint.common.logging import get_logger, setup_logger
 from sru_lint.common.patch_processor import process_patch_content
 from sru_lint.common.ui.snippet import render_snippet
+from sru_lint.madison.cli import madison
 from sru_lint.plugin_manager import PluginManager
 
 
@@ -455,6 +456,9 @@ app = typer.Typer(
     add_completion=False,
     callback=lambda: None,  # Dummy callback to allow global options
 )
+
+
+app.command()(madison)
 
 
 # Add global options to the main app

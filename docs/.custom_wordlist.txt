@@ -67,3 +67,11 @@ Jira
 Kanban
 mypy
 debdiff
+armel
+esmadison
+esmadison's
+OAuth
+PPAs
+stderr
+ETag
+validator
