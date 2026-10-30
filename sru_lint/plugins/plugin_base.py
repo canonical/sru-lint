@@ -2,9 +2,12 @@ import fnmatch
 import re
 from abc import ABC, abstractmethod
 
+from debian.debian_support import Version
+
 from sru_lint.common.errors import ErrorCode
 from sru_lint.common.feedback import FeedbackItem, Severity, SourceSpan
 from sru_lint.common.logging import get_logger
+from sru_lint.common.madison import get_madison
 from sru_lint.common.patch_processor import ProcessedFile
 
 
@@ -26,6 +29,7 @@ class Plugin(ABC):
         self._file_patterns: set[str] = set()
         self.feedback: list[FeedbackItem] = []  # List to collect feedback items
         self.lp_helper = get_launchpad_helper()
+        self.use_madison = False  # set by the CLI's --madison flag
         self.logger = get_logger(f"plugins.{self.__symbolic_name__}")
         self.register_file_patterns()
 
@@ -133,6 +137,62 @@ class Plugin(ABC):
             f"Processed {len(matching_files)} files, found {len(self.feedback)} issues"
         )
         return self.feedback
+
+    def check_madison_version(
+        self, source_span: SourceSpan, package: str, version: str, release: str
+    ) -> None:
+        """Warn if ``version`` collides with, or is lower than, a version of ``package``
+        published for ``release`` in the Pro/ESM, kernel, Landscape or MAAS repositories.
+
+        Does nothing unless ``use_madison`` is set.
+        """
+        if not self.use_madison:
+            return
+
+        release = release.split("-", 1)[0]
+        try:
+            result = get_madison().source_versions(package)
+            new_version = Version(version)
+            collisions: set[str] = set()
+            higher: dict[str, set[str]] = {}
+            for entry in result.entries:
+                if entry.release != release:
+                    continue
+                location = f"{entry.category}/{entry.suite}"
+                published = Version(entry.source_version)
+                if published == new_version:
+                    collisions.add(location)
+                elif published > new_version:
+                    higher.setdefault(entry.source_version, set()).add(location)
+        except Exception as e:
+            self.logger.warning(f"Madison lookup failed for {package}: {type(e).__name__}: {e}")
+            return
+
+        if collisions:
+            self.create_line_feedback(
+                message=(
+                    f"Version {version} of {package} is already published in: "
+                    f"{', '.join(sorted(collisions))}"
+                ),
+                rule_id=ErrorCode.MADISON_VERSION_COLLISION,
+                severity=Severity.WARNING,
+                source_span=source_span,
+                target_line_content=version,
+            )
+        if higher:
+            details = "; ".join(
+                f"{v} in {', '.join(sorted(locations))}"
+                for v, locations in sorted(higher.items(), key=lambda item: Version(item[0]))
+            )
+            self.create_line_feedback(
+                message=(
+                    f"Higher version(s) of {package} already published for {release}: {details}"
+                ),
+                rule_id=ErrorCode.MADISON_HIGHER_VERSION_EXISTS,
+                severity=Severity.WARNING,
+                source_span=source_span,
+                target_line_content=version,
+            )
 
     @abstractmethod
     def process_file(self, processed_file: ProcessedFile) -> None:

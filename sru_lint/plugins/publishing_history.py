@@ -1,5 +1,6 @@
 from debian import changelog
 
+from sru_lint.common.distro_helper import is_esm_only_release
 from sru_lint.common.errors import ErrorCode
 from sru_lint.common.feedback import Severity, SourceLine, SourceSpan
 from sru_lint.common.launchpad_helper import LaunchpadHelper
@@ -106,6 +107,15 @@ class PublishingHistory(Plugin):
             distro = parse_distributions_field(distribution)
             target_distro = distro[0] if distro and len(distro) > 0 else distribution
             target_version = Version(version_to_check)
+
+            # ESM-only releases are covered by the pro-version-numbers plugin.
+            if self.use_madison and not is_esm_only_release(target_distro.split("-", 1)[0]):
+                self.check_madison_version(
+                    self.find_version_line_span(processed_file, version_to_check),
+                    package_name,
+                    version_to_check,
+                    target_distro,
+                )
 
             # Get the distro series object for server-side filtering
             distro_series = self.lp_helper.search_series(target_distro)

@@ -41,6 +41,8 @@ class ProVersionNumbers(Plugin):
         changelog_version = str(cl.version)
         self.logger.info(f"Checking Pro PPAs for {package} {changelog_version} (release={release})")
 
+        self.check_madison_version(source_span, package or "", changelog_version, release)
+
         highest_version: str | None = None
         highest_ppa: str | None = None
         for ppa in LaunchpadHelper.PRO_PPAS:
