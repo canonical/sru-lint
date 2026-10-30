@@ -60,6 +60,14 @@ warn you when this happens.
 
 ## Package version lookups
 
+Use `sru-lint check --use-madison INPUT` to add an index-based version
+check of ESM repositories for the changelog's target release. The existing
+Pro PPA lookup, including staging and source-only publications, still runs
+for ESM-only releases. Madison searches all supported architectures, shares
+lookups between plugins, and warns if the search is incomplete. Other series
+and independently versioned product repositories are excluded from this check;
+see the usage documentation for details.
+
 Search ESM and product PPA binary indexes with the `madison` subcommand:
 
 ```bash

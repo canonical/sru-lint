@@ -21,6 +21,7 @@ from sru_lint.common.logging import get_logger, setup_logger
 from sru_lint.common.patch_processor import process_patch_content
 from sru_lint.common.ui.snippet import render_snippet
 from sru_lint.madison.cli import madison
+from sru_lint.madison.service import MadisonService
 from sru_lint.plugin_manager import PluginManager
 
 
@@ -503,6 +504,11 @@ def check(
         "-f",
         help="Output format: 'console' for human-readable output with snippets, 'json' for machine-readable JSON array",
     ),
+    use_madison: bool = typer.Option(
+        False,
+        "--use-madison",
+        help="Supplement the Pro version check with target-release ESM indexes.",
+    ),
 ):
     """
     Run the linter on the specified patch from a file, URL, or stdin.
@@ -521,6 +527,12 @@ def check(
     plugins = load_and_filter_plugins(expanded_modules, format)
     if not plugins:
         return  # Early exit if no plugins found
+
+    # One run-scoped service is shared by all plugins, which run concurrently.
+    if use_madison:
+        service = MadisonService()
+        for plugin in plugins:
+            plugin.madison = service
 
     # Show processing summary
     show_processing_summary(processed_files, plugins, format)

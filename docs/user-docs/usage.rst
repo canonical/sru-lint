@@ -145,6 +145,34 @@ Examples:
    # previous version recorded in debian/changelog
    sru-lint check ~/work/foo
 
+Optional Madison version lookup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``sru-lint check --use-madison INPUT`` supplements the ``pro-version-numbers``
+plugin's Launchpad PPA lookup with a search of Madison's ESM repository indexes.
+The existing PPA check still runs for ESM-only releases, preserving staging and
+source-only publication coverage. Madison also supports checking ESM indexes
+for releases that are not yet ESM-only.
+
+Madison compares only the changelog's target release (after stripping a pocket
+suffix), across the ``infra``, ``infra-legacy``, ``apps`` and ``apps-legacy``
+categories and all supported architectures. Other series and independently
+versioned product repositories are excluded. The highest version from the
+applicable PPA and Madison checks is compared using Debian version ordering.
+Matching uses the binary index's ``Source`` field (or ``Package`` when absent),
+not just the binary package name. The existing PPA lookup scope and the main
+Ubuntu archive publishing-history check are unchanged.
+
+Madison searches only published binary indexes: source-only uploads, removed
+versions, proposed pockets and repositories absent from its catalogue may not
+appear. The supplementary lookup does not replace the PPA check. Missing
+indexes (404) are skipped; other failures produce a warning even if partial
+results are available. Searching all architectures can take time and require
+network access. The validated disk cache is shared with the ``madison`` command;
+repeated requests for the same source and release by plugins in a single check
+share one lookup, including failures. Without the flag the existing
+Launchpad-based check is unchanged.
+
 Selecting plugins
 ~~~~~~~~~~~~~~~~~
 
