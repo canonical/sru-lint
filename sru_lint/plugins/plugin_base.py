@@ -6,6 +6,7 @@ from sru_lint.common.errors import ErrorCode
 from sru_lint.common.feedback import FeedbackItem, Severity, SourceSpan
 from sru_lint.common.logging import get_logger
 from sru_lint.common.patch_processor import ProcessedFile
+from sru_lint.madison.service import MadisonService
 
 
 class Plugin(ABC):
@@ -26,6 +27,8 @@ class Plugin(ABC):
         self._file_patterns: set[str] = set()
         self.feedback: list[FeedbackItem] = []  # List to collect feedback items
         self.lp_helper = get_launchpad_helper()
+        # Set by the check command when the optional index-based lookup is enabled.
+        self.madison: MadisonService | None = None
         self.logger = get_logger(f"plugins.{self.__symbolic_name__}")
         self.register_file_patterns()
 
