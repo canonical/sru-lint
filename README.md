@@ -58,6 +58,28 @@ confinement blocking the keyring, etc.) the credentials cannot persist and
 `sru-lint check` will fall back to anonymous access — `sru-lint login` will
 warn you when this happens.
 
+## Package version lookups
+
+Search ESM and product PPA binary indexes with the `madison` subcommand:
+
+```bash
+sru-lint madison -c infra -s jammy-infra-security openssl
+sru-lint madison -c landscape-latest-stable -a amd64,arm64 landscape-client
+sru-lint madison -c apps -r '^python3-requests$' --format json
+sru-lint madison --clear-cache
+```
+
+Defaults search all configured repositories for `amd64`. Use `-c`, `-s`, and
+`-a` to narrow the search; `-a all` queries all supported architectures.
+A HEAD request checks each index's ETag or Last-Modified validator; matching
+indexes are reused from `${XDG_CACHE_HOME:-~/.cache}/sru-lint/madison`.
+Misses require an additional GET, and indexes without validators are downloaded
+on every lookup. Old versions remain until `--clear-cache`; clearing does not
+cancel in-flight downloads, which may repopulate the cache. HTTP proxies may
+serve a view that lags the origin. This command does not use Launchpad OAuth.
+See the usage documentation for
+repository categories, filtering, and exit codes.
+
 ## What it checks
 
 - **Changelog entries** (valid distributions, LP bugs, version ordering)

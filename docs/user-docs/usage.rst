@@ -19,6 +19,7 @@ Synopsis
 .. code-block:: text
 
    sru-lint [GLOBAL OPTIONS] check    [OPTIONS] INPUT
+   sru-lint [GLOBAL OPTIONS] madison [OPTIONS] [PACKAGES]...
    sru-lint [GLOBAL OPTIONS] plugins
    sru-lint [GLOBAL OPTIONS] login
    sru-lint help [COMMAND]
@@ -32,6 +33,79 @@ Global options:
 
 ``-q``, ``--quiet``
    Suppress everything below ``ERROR``-level logs.
+
+The ``madison`` command
+-----------------------
+
+Look up binary package versions directly in compressed APT indexes, without
+running lint plugins or authenticating to Launchpad:
+
+.. code-block:: bash
+
+   sru-lint madison -c infra -s jammy-infra-security openssl
+   sru-lint madison -c landscape-latest-stable -a amd64,arm64 landscape-client
+   sru-lint -v madison -c apps -r '^python3-requests$' --format json
+   sru-lint madison --clear-cache
+
+Options:
+
+* Positional package names and ``-p/--packages`` are combined. Comma-separated
+  lists are accepted; matching is exact unless ``-r/--regex`` is supplied.
+* ``-c/--category``, ``-s/--suite``, and ``-a/--architecture`` accept
+  comma-separated lists or repeated flags. Defaults are all categories,
+  category-specific suites, and ``amd64`` respectively. Explicit suites apply
+  to every selected category, even if a combination is unavailable.
+* ``-a all`` queries amd64, i386, arm64, armel, armhf, ``powerpc``, ppc64el,
+  riscv64, and s390x.
+* ``-f/--filter`` applies a Python regular expression to the canonical result
+  line: ``package | version | category | suite | architectures`` (one space
+  around each pipe). ``--regex`` also uses Python syntax, not grep syntax,
+  and searches anywhere in the package name; use anchors for full matching.
+* ``--format console`` (default) prints aligned pipe-separated rows.
+  ``--format json`` emits an array of objects with ``package``, ``version``,
+  ``category``, ``suite``, and ``architectures`` (an array). Diagnostics go to
+  stderr. Global ``-q`` suppresses console results, not JSON or error
+  summaries; global ``-v`` reports checked URLs and individual failures on
+  stderr. ``-q`` takes precedence over ``-v``.
+* ``-C/--clear-cache`` removes cached indexes before searching, or can run
+  alone. The cache is ``${XDG_CACHE_HOME:-~/.cache}/sru-lint/madison``.
+  Each lookup uses HEAD to discover the ETag (or Last-Modified) and reuses a
+  matching index. A miss requires an additional GET; without a validator the
+  index is downloaded every time. Old versions remain until explicitly cleared.
+  Clearing does not cancel in-flight downloads, which may repopulate the cache.
+  HTTP proxies may report a view that lags the origin. Failed refreshes are
+  reported, rather than silently searching stale data.
+
+Categories and default suites
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* ``infra``: trusty, xenial, bionic, focal, jammy, noble, resolute, with
+  ``-infra-security`` and ``-infra-updates`` suffixes.
+* ``infra-legacy``: trusty and xenial with ``-infra-legacy-security`` and
+  ``-infra-legacy-updates`` suffixes.
+* ``apps``: xenial, bionic, focal, jammy, noble, resolute, with
+  ``-apps-security`` and ``-apps-updates`` suffixes.
+* ``apps-legacy``: xenial-apps-legacy-security and xenial-apps-legacy-updates.
+* ``fips``: xenial, bionic, focal, jammy; ``fips-preview``: focal, jammy;
+  ``fips-updates``: xenial, bionic, focal, jammy, noble with ``-updates``.
+* ``realtime``: jammy, noble.
+* ``ros``: xenial, bionic, focal with ``-updates`` and ``-security``;
+  ``ros-updates``: xenial-updates and bionic-updates.
+* ``kernel-ppa`` and ``kernel-ppa2``: focal, jammy, noble, resolute.
+* ``landscape-VERSION``: versions 19.10, 23.03, 24.04, 26.04, beta,
+  latest-stable, latest-stable-client.
+* ``maas-VERSION``: versions 2.7–2.9 and 3.0–3.8.
+  Landscape and MAAS default to bionic, focal, jammy, noble, resolute.
+
+Not every repository publishes every suite or architecture. Missing indexes
+(HTTP 404) are counted in a summary, not treated as search failures.
+Other download or parsing errors produce partial results, an error summary,
+and exit status 1. Use ``-v`` for details of each failure. A complete search
+exits 0 even without matches; invalid arguments exit 2.
+
+Rows aggregate queried binary-index architectures, not the package control
+field: an ``Architecture: all`` package may appear under several queried
+architectures. Different versions, suites, and categories remain separate.
 
 The ``check`` command
 ---------------------
