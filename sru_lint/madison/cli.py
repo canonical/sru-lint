@@ -2,15 +2,13 @@
 
 import json
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
-from itertools import product
 
 import typer
 
+from sru_lint.madison.api import build_jobs, run_jobs
 from sru_lint.madison.cache import IndexCache
-from sru_lint.madison.repositories import ARCHITECTURES, CATEGORIES, index_url
-from sru_lint.madison.search import aggregate, search_index
+from sru_lint.madison.repositories import ARCHITECTURES, CATEGORIES
 
 
 def expand(values: list[str] | None) -> list[str]:
@@ -66,12 +64,7 @@ def madison(
             for query in queries:
                 re.compile(query)
         pattern = re.compile(filter_pattern) if filter_pattern is not None else None
-        jobs = []
-        for cat in categories:
-            if cat not in CATEGORIES:
-                raise ValueError(f"Unknown category: {cat}")
-            for selected_suite, arch in product(suites or CATEGORIES[cat], architectures):
-                jobs.append((cat, selected_suite, arch, index_url(cat, selected_suite, arch)))
+        jobs = build_jobs(categories, suites, architectures)
     except (ValueError, re.error) as error:
         raise typer.BadParameter(str(error)) from error
     cache = IndexCache()
@@ -84,37 +77,18 @@ def madison(
     if not queries:
         return
 
-    def fetch_search(job):
-        cat, selected_suite, arch, url = job
-        with cache.open_index(url) as index:
-            if index is None:
-                return None
-            return [
-                (name, version, cat, selected_suite, arch)
-                for name, version in search_index(index, queries, regex)
-            ]
+    def report(job, error):
+        if global_options.verbose and not global_options.quiet:
+            if error is None:
+                typer.echo(f"Checked {job[3]}", err=True)
+            else:
+                typer.echo(f"Failed {job[3]}: {error}", err=True)
 
-    rows = []
-    failures = 0
-    unavailable = 0
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {executor.submit(fetch_search, job): job for job in jobs}
-        for future in as_completed(futures):
-            job = futures[future]
-            try:
-                matches = future.result()
-                if matches is None:
-                    unavailable += 1
-                else:
-                    rows.extend(matches)
-                if global_options.verbose and not global_options.quiet:
-                    typer.echo(f"Checked {job[3]}", err=True)
-            except Exception as error:
-                failures += 1
-                if global_options.verbose and not global_options.quiet:
-                    typer.echo(f"Failed {job[3]}: {error}", err=True)
+    outcome = run_jobs(jobs, queries, regex=regex, cache=cache, on_job_complete=report)
+    unavailable = outcome.unavailable
+    failures = outcome.failures
     results = [
-        result for result in aggregate(rows) if pattern is None or pattern.search(result.line())
+        result for result in outcome.results if pattern is None or pattern.search(result.line())
     ]
     if output_format == "json":
         typer.echo(json.dumps([asdict(result) for result in results], indent=2))

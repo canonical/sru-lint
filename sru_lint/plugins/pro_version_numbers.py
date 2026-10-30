@@ -5,10 +5,8 @@ from sru_lint.common.distro_helper import is_esm_only_release
 from sru_lint.common.errors import ErrorCode
 from sru_lint.common.feedback import Severity
 from sru_lint.common.launchpad_helper import LaunchpadHelper
-from sru_lint.common.parse import UNRELEASED_DISTRIBUTION, parse_distributions_field
+from sru_lint.common.parse import base_release
 from sru_lint.plugins.plugin_base import Plugin, ProcessedFile
-
-_POCKETS = ("-proposed", "-updates", "-security", "-backports")
 
 
 class ProVersionNumbers(Plugin):
@@ -87,11 +85,4 @@ class ProVersionNumbers(Plugin):
         release names ``distro_info`` exposes (e.g. ``xenial``, not
         ``xenial-security``). Returns None for empty or UNRELEASED.
         """
-        tokens = parse_distributions_field(distributions)
-        if not tokens or tokens[0] == UNRELEASED_DISTRIBUTION:
-            return None
-        target = tokens[0]
-        for pocket in _POCKETS:
-            if target.endswith(pocket):
-                return target[: -len(pocket)]
-        return target
+        return base_release(distributions)
