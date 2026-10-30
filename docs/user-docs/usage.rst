@@ -180,6 +180,20 @@ Output formats
 
    sru-lint check -f json . | jq '.[] | select(.severity == "ERROR")'
 
+Madison version checks
+~~~~~~~~~~~~~~~~~~~~~~
+
+``-M`` / ``--madison`` makes the version-checking plugins
+(``publishing-history`` and ``pro-version-numbers``) also consult the
+``madison`` data (Ubuntu Pro/ESM, kernel, Landscape and MAAS repositories).
+A warning is reported when the changelog version is already published for
+the same Ubuntu release (``MADISON001``) or when a higher version exists
+there (``MADISON002``).
+
+.. code-block:: bash
+
+   sru-lint check --madison .
+
 Exit codes
 ~~~~~~~~~~
 

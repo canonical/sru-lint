@@ -214,7 +214,9 @@ def process_input_to_files(patch_content: str):
     return processed_files
 
 
-def load_and_filter_plugins(modules: list[str], output_format: OutputFormat):
+def load_and_filter_plugins(
+    modules: list[str], output_format: OutputFormat, use_madison: bool = False
+):
     """Load plugins and filter them based on specified modules."""
     logger = get_logger("cli")
 
@@ -222,6 +224,8 @@ def load_and_filter_plugins(modules: list[str], output_format: OutputFormat):
     pm = PluginManager()
     plugins = pm.load_plugins()
     logger.debug(f"Loaded {len(plugins)} plugins")
+    for plugin in plugins:
+        plugin.use_madison = use_madison
 
     # Filter plugins based on modules
     if "all" not in modules:
@@ -503,6 +507,12 @@ def check(
         "-f",
         help="Output format: 'console' for human-readable output with snippets, 'json' for machine-readable JSON array",
     ),
+    madison_check: bool = typer.Option(
+        False,
+        "--madison",
+        "-M",
+        help="Also check version numbers against the Pro/ESM, kernel, Landscape and MAAS repositories (madison data)",
+    ),
 ):
     """
     Run the linter on the specified patch from a file, URL, or stdin.
@@ -518,7 +528,7 @@ def check(
     processed_files = process_input_to_files(patch_content)
 
     # Load and filter plugins
-    plugins = load_and_filter_plugins(expanded_modules, format)
+    plugins = load_and_filter_plugins(expanded_modules, format, madison_check)
     if not plugins:
         return  # Early exit if no plugins found
 
