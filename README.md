@@ -86,6 +86,7 @@ repository categories, filtering, and exit codes.
 - **DEP-3 patch format** compliance
 - **Launchpad integration** (bug targeting, SRU templates, publication history)
 - **Upload queue** conflicts
+- **Version collisions** with versions already in ESM, Ubuntu Pro and product PPA repositories (`madison-collision`)
 - And more via the plugin system...
 
 ## Development

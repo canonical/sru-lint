@@ -161,6 +161,31 @@ repeated flags:
 Symbolic names come from the plugin class (``ChangelogEntry`` →
 ``changelog-entry``). List them with ``sru-lint plugins``.
 
+Version collisions in non-public repositories
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``madison-collision`` plugin checks that the version in the first
+``debian/changelog`` entry of the patch does not already exist in the
+non-public repositories searched by the ``madison`` command (ESM, Ubuntu Pro,
+and the Canonical PPAs). It complements ``publishing-history``, which covers
+the public Ubuntu archive.
+
+* An exact match is reported as an ``ERROR`` (``MADISON001``) listing each
+  ``category/suite`` that already contains the version.
+* If some indexes cannot be downloaded or read, a ``WARNING``
+  (``MADISON002``) says the search was incomplete. The same warning is used if
+  the check could not run at all. Indexes that do not exist (HTTP 404) are
+  ignored.
+* Only the suites that belong to the release in the changelog distribution are
+  searched, so ``jammy-security`` searches ``jammy`` suites only. Entries
+  targeting ``UNRELEASED`` and Ubuntu Cloud Archive versions (``~cloudN``) are
+  skipped.
+* Like the ``madison`` command, only the ``amd64`` indexes are searched. The
+  package name is matched against binary package names, and the version
+  string must match exactly.
+* Downloaded indexes share the cache used by the ``madison`` command. The
+  first run for a release downloads a few dozen indexes.
+
 Output formats
 ~~~~~~~~~~~~~~
 

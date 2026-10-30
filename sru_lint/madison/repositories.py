@@ -54,6 +54,11 @@ for version in ("2.7", "2.8", "2.9", *(f"3.{minor}" for minor in range(9))):
     CATEGORIES[f"maas-{version}"] = RECENT
 
 
+def suite_matches_release(suite: str, release: str) -> bool:
+    """Return True if ``suite`` is ``release`` or one of its pockets, e.g. ``jammy-infra-security``."""
+    return suite == release or suite.startswith(f"{release}-")
+
+
 def index_url(category: str, suite: str, architecture: str) -> str:
     """Build an index URL, rejecting unrecognized or unsafe components."""
     if category not in CATEGORIES:
