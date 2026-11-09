@@ -1,6 +1,7 @@
 name: Build Snap package
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
@@ -35,7 +36,7 @@ jobs:
         id: build
 
       - uses: snapcore/action-publish@v1
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_LOGIN }}
         with:
