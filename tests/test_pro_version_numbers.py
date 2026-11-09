@@ -3,6 +3,8 @@ from unittest.mock import MagicMock, patch
 
 from sru_lint.common.errors import ErrorCode
 from sru_lint.common.feedback import Severity, SourceLine, SourceSpan
+from sru_lint.madison.search import Result
+from sru_lint.madison.service import Lookup
 from sru_lint.plugins.plugin_base import ProcessedFile
 from sru_lint.plugins.pro_version_numbers import ProVersionNumbers
 
@@ -75,6 +77,7 @@ class TestProVersionNumbers(unittest.TestCase):
         self.plugin = ProVersionNumbers()
         self.plugin.feedback = []
         self.mock_lp = MagicMock()
+        self.mock_lp.get_highest_version_in_ppa.return_value = None
         self.plugin.lp_helper = self.mock_lp
 
     def test_symbolic_name(self):
@@ -197,6 +200,105 @@ class TestProVersionNumbers(unittest.TestCase):
         self.plugin.process_file(pf)
         self.assertEqual(self.plugin.feedback, [])
         self.mock_lp.get_highest_version_in_ppa.assert_called()
+
+    @patch("sru_lint.plugins.pro_version_numbers.is_esm_only_release", return_value=False)
+    def test_madison_checks_target_release_before_esm_only(self, _is_esm):
+        self.plugin.madison = MagicMock()
+        self.plugin.madison.lookup_source.return_value = Lookup(
+            (Result("pkg-bin", "1.2.3-0ubuntu2", "infra", "jammy-infra-security", ("arm64",)),), ()
+        )
+        pf = make_processed_file("debian/changelog", REGULAR_CHANGELOG)
+        self.plugin.process_file(pf)
+        self.plugin.madison.lookup_source.assert_called_once_with("pkg", "jammy")
+        self.mock_lp.get_highest_version_in_ppa.assert_not_called()
+        self.assertEqual(self.plugin.feedback[0].rule_id, ErrorCode.PRO_VERSION_NOT_HIGHER)
+        self.assertIn("infra/jammy-infra-security", self.plugin.feedback[0].message)
+
+    @patch("sru_lint.plugins.pro_version_numbers.is_esm_only_release", return_value=True)
+    def test_madison_uses_debian_order_and_accepts_newer_version(self, _is_esm):
+        self.plugin.madison = MagicMock()
+        self.plugin.madison.lookup_source.return_value = Lookup(
+            (
+                Result("pkg", "1.2.3-0ubuntu1~esm1", "apps", "xenial", ("amd64",)),
+                Result(
+                    "pkg-bin", "1.2.3-0ubuntu1~esm10", "infra", "xenial-infra-security", ("arm64",)
+                ),
+            ),
+            (),
+        )
+        self.plugin.process_file(make_processed_file("debian/changelog", ESM_CHANGELOG))
+        self.assertIn("~esm10", self.plugin.feedback[0].message)
+        self.plugin.feedback.clear()
+        self.plugin.madison.lookup_source.return_value = Lookup((), ())
+        self.plugin.process_file(make_processed_file("debian/changelog", ESM_CHANGELOG))
+        self.assertEqual(self.plugin.feedback, [])
+        self.plugin.madison.lookup_source.return_value = Lookup(
+            (Result("pkg", "1.2.3-0ubuntu1~esm1", "apps", "xenial", ("amd64",)),), ()
+        )
+        self.plugin.process_file(make_processed_file("debian/changelog", ESM_CHANGELOG))
+        self.assertEqual(self.plugin.feedback, [])
+
+    @patch("sru_lint.plugins.pro_version_numbers.is_esm_only_release", return_value=True)
+    def test_madison_incomplete_and_partial_results(self, _is_esm):
+        self.plugin.madison = MagicMock()
+        self.plugin.madison.lookup_source.return_value = Lookup(
+            (Result("pkg", "1.2.3-0ubuntu1~esm2", "apps", "xenial", ("amd64",)),),
+            ("network failure",),
+        )
+        self.plugin.process_file(make_processed_file("debian/changelog", ESM_CHANGELOG))
+        self.assertEqual(
+            [item.rule_id for item in self.plugin.feedback],
+            [ErrorCode.PRO_VERSION_LOOKUP_FAILED, ErrorCode.PRO_VERSION_NOT_HIGHER],
+        )
+
+    @patch("sru_lint.plugins.pro_version_numbers.is_esm_only_release", return_value=True)
+    def test_madison_preserves_staging_and_source_only_ppa_checks(self, _is_esm):
+        staging = "ppa:ubuntu-esm/esm-infra-security-staging"
+        for lookup in (Lookup((), ()), Lookup((), ("network failure",))):
+            with self.subTest(failures=lookup.failures):
+                self.plugin.feedback.clear()
+                self.plugin.madison = MagicMock()
+                self.plugin.madison.lookup_source.return_value = lookup
+                self.mock_lp.get_highest_version_in_ppa.side_effect = lambda ppa, _pkg: (
+                    "1.2.3-0ubuntu1~esm5" if ppa == staging else None
+                )
+                self.plugin.process_file(make_processed_file("debian/changelog", ESM_CHANGELOG))
+                errors = [fb for fb in self.plugin.feedback if fb.severity == Severity.ERROR]
+                self.assertEqual(len(errors), 1)
+                self.assertEqual(errors[0].rule_id, ErrorCode.PRO_VERSION_NOT_HIGHER)
+                self.assertIn(staging, errors[0].message)
+                self.assertIn("~esm5", errors[0].message)
+
+    @patch("sru_lint.plugins.pro_version_numbers.is_esm_only_release", return_value=True)
+    def test_madison_and_ppa_use_combined_maximum_without_duplicate_errors(self, _is_esm):
+        self.plugin.madison = MagicMock()
+        self.plugin.madison.lookup_source.return_value = Lookup(
+            (Result("pkg", "1.2.3-0ubuntu1~esm5", "apps", "xenial-apps-security", ("amd64",)),),
+            (),
+        )
+        for ppa_version, origin in (
+            ("1.2.3-0ubuntu1~esm3", "apps/xenial-apps-security"),
+            ("1.2.3-0ubuntu1~esm10", "ppa:ubuntu-esm/"),
+        ):
+            with self.subTest(ppa_version=ppa_version):
+                self.plugin.feedback.clear()
+                self.mock_lp.get_highest_version_in_ppa.return_value = ppa_version
+                self.plugin.process_file(make_processed_file("debian/changelog", ESM_CHANGELOG))
+                self.assertEqual(len(self.plugin.feedback), 1)
+                self.assertIn(origin, self.plugin.feedback[0].message)
+
+    @patch("sru_lint.plugins.pro_version_numbers.is_esm_only_release", return_value=True)
+    def test_madison_uses_base_release_for_pocket_changelog(self, _is_esm):
+        self.plugin.madison = MagicMock()
+        self.plugin.madison.lookup_source.return_value = Lookup((), ())
+        self.plugin.process_file(make_processed_file("debian/changelog", ESM_POCKET_CHANGELOG))
+        self.plugin.madison.lookup_source.assert_called_once_with("pkg", "xenial")
+        self.mock_lp.get_highest_version_in_ppa.assert_called()
+
+    def test_madison_skips_unreleased(self):
+        self.plugin.madison = MagicMock()
+        self.plugin.process_file(make_processed_file("debian/changelog", UNRELEASED_CHANGELOG))
+        self.plugin.madison.lookup_source.assert_not_called()
 
     def test_base_release_helper(self):
         f = ProVersionNumbers._base_release

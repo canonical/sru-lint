@@ -32,6 +32,24 @@ class TestCLI(unittest.TestCase):
         mock_span.lines_added = []
         return mock_span
 
+    @patch("sru_lint.cli.MadisonService")
+    @patch("sru_lint.cli.process_patch_content")
+    @patch("sru_lint.cli.PluginManager")
+    def test_madison_flag_shares_service(self, manager, process_patch, service):
+        plugins = [MagicMock(), MagicMock()]
+        for i, plugin in enumerate(plugins):
+            plugin.__symbolic_name__ = f"plugin{i}"
+            plugin.feedback = []
+        manager.return_value.load_plugins.return_value = plugins
+        process_patch.return_value = [ProcessedFile(path="test", source_span=MagicMock())]
+        result = self.runner.invoke(
+            app, ["check", "--use-madison", "-f", "json", "-"], input="patch"
+        )
+        self.assertEqual(result.exit_code, 0, result.output)
+        service.assert_called_once_with()
+        for plugin in plugins:
+            self.assertIs(plugin.madison, service.return_value)
+
     @patch("sru_lint.cli.render_snippet")
     @patch("sru_lint.cli.process_patch_content")
     @patch("sru_lint.cli.PluginManager")
