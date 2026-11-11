@@ -23,7 +23,7 @@ jobs:
 
     steps:
     - name: Checkout sru-lint
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         repository: canonical/sru-lint
         ref: ${{ inputs.source_ref || '' }}
