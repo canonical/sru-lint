@@ -100,8 +100,9 @@ class TestSruLint:
 
         assert findings, "Expected at least one finding from sru-lint"
 
-        # All findings should be publishing-history or changelog-related
-        # (The bug may or may not be targeted depending on Launchpad access)
-        allowed_rule_ids = {"PUBHIST001", "PUBHIST003", "CHANGELOG002"}
+        # All findings should be publishing-history, changelog-related, or patch-related
+        # (The bug may or may not be targeted depending on Launchpad access,
+        # and patches may diverge from upstream)
+        allowed_rule_ids = {"PUBHIST001", "PUBHIST003", "CHANGELOG002", "PATCH008"}
         for finding in findings:
             assert finding["rule_id"] in allowed_rule_ids, f"Unexpected finding: {finding}"
