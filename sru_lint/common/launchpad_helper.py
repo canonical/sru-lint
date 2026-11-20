@@ -310,16 +310,32 @@ class LaunchpadHelper:
         )
 
         for task in bug.bug_tasks:
-            self.logger.debug(
-                f"Checking task: package={task.target.name}, bug_target_name={task.bug_target_name}"
-            )
-            # Normalize distribution names for comparison
-            package_match = task.target.name == package
-            # Check if distribution is in bug_target_name (case-insensitive)
-            dist_match = distribution.lower() in task.bug_target_name.lower()
-            if package_match and dist_match:
-                self.logger.debug(f"Bug #{bug_number} is targeted at {package} in {distribution}")
-                return True
+            try:
+                target_name = getattr(task.target, "name", None)
+                bug_target_name = getattr(task, "bug_target_name", None)
+
+                if target_name is None or bug_target_name is None:
+                    self.logger.debug(
+                        f"Skipping task with missing target.name or bug_target_name: "
+                        f"target_name={target_name}, bug_target_name={bug_target_name}"
+                    )
+                    continue
+
+                self.logger.debug(
+                    f"Checking task: package={target_name}, bug_target_name={bug_target_name}"
+                )
+                # Normalize distribution names for comparison
+                package_match = target_name == package
+                # Check if distribution is in bug_target_name (case-insensitive)
+                dist_match = distribution.lower() in bug_target_name.lower()
+                if package_match and dist_match:
+                    self.logger.debug(
+                        f"Bug #{bug_number} is targeted at {package} in {distribution}"
+                    )
+                    return True
+            except Exception as e:
+                self.logger.warning(f"Error checking bug task for bug #{bug_number}: {e}")
+                continue
 
         self.logger.debug(f"Bug #{bug_number} is NOT targeted at {package} in {distribution}")
         return False
