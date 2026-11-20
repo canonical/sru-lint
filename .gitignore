@@ -137,3 +137,5 @@ secrets/
 *.cover
 *.cov
 
+# Snapcraft artifacts
+*.snap
