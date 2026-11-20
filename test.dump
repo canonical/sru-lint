@@ -1,0 +1,34 @@
+- name: canonical
+  accounts:
+    - name: ubuntusso
+      token: 7LSBI3O2AZUH7ANPAZKAKAMHYMM2FN2B
+      prefix: ""
+      algorithm: ""
+      length: 0
+      timePeriod: 0
+    - name: google
+      token: h4gi 3zcc czup fnpp vwau 7dz5 pu36 msuw
+      prefix: ""
+      algorithm: ""
+      length: 6
+      timePeriod: 0
+- name: personal
+  accounts:
+    - name: godaddy
+      token: 56L7JOHZRPD2ZZWP
+      prefix: ""
+      algorithm: ""
+      length: 0
+      timePeriod: 0
+    - name: aws+general
+      token: 45BTBZQODCVZAFFOCTVBEO3NRFG3TFI7I733PIZX3BDBQ22PASOJVBKYDNMJ3Q4C
+      prefix: ""
+      algorithm: ""
+      length: 6
+      timePeriod: 0
+    - name: aws+prod
+      token: SMNVCXMODRF6D2TL3ZTOYO2K7Z752KMNTAKOCDQFGUDHQQQ2DSYAXYS4LWOI2TR6
+      prefix: ""
+      algorithm: ""
+      length: 6
+      timePeriod: 0

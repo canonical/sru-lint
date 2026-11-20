@@ -1,0 +1,33 @@
+From bc90a5c356e402a5c1cabe3ad5728c3e5d2e4659 Mon Sep 17 00:00:00 2001
+From: Dariusz Gadomski <dgadomski@ubuntu.com>
+Date: Mon, 9 Nov 2026 22:48:01 +0100
+Subject: [PATCH] Enable manual snap builds and publishing
+
+---
+ .github/workflows/build-snap.yml | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/.github/workflows/build-snap.yml b/.github/workflows/build-snap.yml
+index ebd65b1..0664ad8 100644
+--- a/.github/workflows/build-snap.yml
++++ b/.github/workflows/build-snap.yml
+@@ -1,6 +1,7 @@
+ name: Build Snap package
+ 
+ on:
++  workflow_dispatch:
+   push:
+     branches: [ main ]
+   pull_request:
+@@ -35,7 +36,7 @@ jobs:
+         id: build
+ 
+       - uses: snapcore/action-publish@v1
+-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
++        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+         env:
+           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_LOGIN }}
+         with:
+-- 
+2.53.0
+

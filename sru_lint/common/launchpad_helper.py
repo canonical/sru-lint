@@ -65,10 +65,6 @@ class LaunchpadHelper:
         for plugins that don't end up querying Launchpad.
         """
         self.logger = get_logger("launchpad_helper")
-        # Set by login() to indicate whether OAuth creds round-tripped
-        # successfully through the keyring. None means login() was never
-        # called on this instance.
-        self.credentials_persisted: bool | None = None
 
     def _ensure_connection(self):
         """Ensure a Launchpad connection exists for the current thread.
@@ -129,67 +125,6 @@ class LaunchpadHelper:
             # rather than failing the whole CLI. The anonymous fallback
             # keeps `check` usable.
             return False
-
-    def login(self) -> Launchpad:
-        """
-        Perform an authenticated Launchpad login via OAuth.
-
-        Triggers the browser-based authorization flow on first use and caches
-        the resulting credentials so subsequent invocations reuse them.
-        Replaces the current thread's connection with the authenticated one.
-
-        After the OAuth flow completes, this method verifies that credentials
-        were actually persisted by re-loading them from the keyring.
-        ``self.credentials_persisted`` is set to True on a successful
-        round-trip, False otherwise. Persistence can fail silently when
-        no usable keyring backend is available (headless session, missing
-        GNOME Keyring / KWallet daemon, or snap confinement blocking the
-        keyring); the login itself still succeeds for the current process.
-
-        Returns:
-            The authenticated Launchpad instance for the current thread.
-        """
-        self.logger.info(
-            f"Performing authenticated Launchpad login for thread {threading.current_thread().name}"
-        )
-
-        save_failed = False
-
-        def _on_save_failed():
-            nonlocal save_failed
-            save_failed = True
-            self.logger.warning(
-                "launchpadlib reported credential persistence failure "
-                "(no writable keyring backend available)"
-            )
-
-        _thread_local.launchpad = Launchpad.login_with(
-            self.APPLICATION_NAME,
-            self.SERVICE_ROOT,
-            self.CACHE_DIR,
-            version=self.API_VERSION,
-            credential_save_failed=_on_save_failed,
-        )
-        _thread_local.ubuntu = _thread_local.launchpad.distributions["ubuntu"]
-        _thread_local.archive = _thread_local.ubuntu.main_archive
-
-        # Verify the save round-trips. The credential_save_failed callback
-        # catches explicit save errors, but some keyring chains silently
-        # no-op on save when no real backend is available — in that case
-        # save_failed stays False but the load returns None.
-        self.credentials_persisted = not save_failed and self._has_stored_credentials()
-        if self.credentials_persisted:
-            self.logger.debug(
-                "Authenticated Launchpad connection established and "
-                "credentials persisted to keyring"
-            )
-        else:
-            self.logger.warning(
-                "Authenticated to Launchpad but credentials did not persist; "
-                "subsequent runs will fall back to anonymous access"
-            )
-
-        return _thread_local.launchpad
 
     @property
     def launchpad(self) -> Launchpad:

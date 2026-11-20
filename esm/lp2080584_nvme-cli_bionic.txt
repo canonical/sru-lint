@@ -1,0 +1,112 @@
+diff -Nru nvme-cli-1.5/debian/changelog nvme-cli-1.5/debian/changelog
+--- nvme-cli-1.5/debian/changelog	2021-11-24 12:37:26.000000000 +0000
++++ nvme-cli-1.5/debian/changelog	2024-09-13 05:34:53.000000000 +0000
+@@ -1,3 +1,10 @@
++nvme-cli (1.5-1ubuntu1.3) bionic; urgency=medium
++
++  * d/p/lp2072381-0001-Avoid-using-unsupported-load-store-instruct.patch
++    - NVMe show-regs command forcibly reboots ARM-based VM (LP: #2072381)
++
++ -- Chengen Du <chengen.du@canonical.com>  Fri, 13 Sep 2024 05:34:53 +0000
++
+ nvme-cli (1.5-1ubuntu1.2) bionic; urgency=medium
+ 
+   * d/p/Fix-bash-completion.patch:
+diff -Nru nvme-cli-1.5/debian/patches/lp2080584-0001-Avoid-using-unsupported-load-store-instruct.patch nvme-cli-1.5/debian/patches/lp2080584-0001-Avoid-using-unsupported-load-store-instruct.patch
+--- nvme-cli-1.5/debian/patches/lp2080584-0001-Avoid-using-unsupported-load-store-instruct.patch	1970-01-01 00:00:00.000000000 +0000
++++ nvme-cli-1.5/debian/patches/lp2080584-0001-Avoid-using-unsupported-load-store-instruct.patch	2024-09-13 05:34:34.000000000 +0000
+@@ -0,0 +1,87 @@
++From: Oliver Upton <oliver.upton@linux.dev>
++Date: Thu Jul 4 19:59:26 2024 +0200
++Subject: common.h: Avoid using unsupported load/store instructions in arm64 VMs
++
++Using nvme show-regs within a VM on arm64 can sometimes lead to VM
++termination.
++
++To answer why this happens: one of the deficiencies of the Arm
++architecture is that there exists a range of load/store instructions
++that have insufficient decode information for traps taken to the
++hypervisor. KVM, for example, may raise an external abort or outright
++terminate the VM depending on the configuration.
++
++This is a known problem on the kernel side, and is fixed by using
++assembly MMIO accessors w/ 'safe' load/store instructions. So do
++exactly that, providing arm64-specific accessors and falling back to
++plain old volatile pointer accesses for other architectures.
++
++Reported-by: William Butler <wab@google.com>
++Signed-off-by: Oliver Upton <oliver.upton@linux.dev>
++
++Bug-Ubuntu: https://launchpad.net/bugs/2080584
++Origin: backport, https://github.com/linux-nvme/nvme-cli/commit/fa5a46cc25b884a61a14f06e6693373bcefff29d
++[chengen - ignore write-related modifications/introduce leint32_t definition]
++
++--- nvme-cli-1.5.orig/nvme-print.c
+++++ nvme-cli-1.5/nvme-print.c
++@@ -2153,19 +2153,54 @@ static void show_registers_bpmbl(uint64_
++ 	printf("\tBoot Partition Memory Buffer Base Address (BMBBA): %"PRIx64"\n", bpmbl);
++ }
++ 
++-static inline uint32_t mmio_read32(void *addr)
+++#ifdef __CHECKER__
+++/* sparse needs forcing to remove bitwise attribute from ccan/short_types */
+++#define ENDIAN_TYPE __attribute__((bitwise))
+++#else
+++#define ENDIAN_TYPE
+++#endif
+++
+++typedef uint32_t ENDIAN_TYPE leint32_t;
+++
+++/*
+++ * VMs on arm64 can only use a subset of instructions for MMIO that provide
+++ * the hypervisor with a complete instruction decode. Provide assembly MMIO
+++ * accessors to prevent the compiler from using a possibly unsupported
+++ * instruction.
+++ *
+++ * See kernel commit c726200dd106 ("KVM: arm/arm64: Allow reporting non-ISV
+++ * data aborts to userspace") for more details.
+++ */
+++#if defined(__aarch64__)
+++static inline leint32_t __raw_readl(const volatile leint32_t *addr)
++ {
++-	__le32 *p = addr;
+++	leint32_t val;
++ 
++-	return le32_to_cpu(*p);
+++	asm volatile("ldr %w0, %1" : "=r" (val) : "Qo" (*addr));
+++
+++	return val;
+++}
+++#else
+++static inline leint32_t __raw_readl(volatile leint32_t *addr)
+++{
+++	return *addr;
+++}
+++#endif
+++
+++static inline uint32_t mmio_read32(void *addr)
+++{
+++	return le32_to_cpu(__raw_readl(addr));
++ }
++ 
++ /* Access 64-bit registers as 2 32-bit; Some devices fail 64-bit MMIO. */
++ static inline __u64 mmio_read64(void *addr)
++ {
++-	__le32 *p = addr;
+++	uint32_t low, high;
+++
+++	low = le32_to_cpu(__raw_readl(addr));
+++	high = le32_to_cpu(__raw_readl(addr + sizeof(leint32_t)));
++ 
++-	return le32_to_cpu(*p) | ((uint64_t)le32_to_cpu(*(p + 1)) << 32);
+++	return ((uint64_t)high << 32) | low;
++ }
++ 
++ void show_ctrl_registers(void *bar, unsigned int mode, bool fabrics)
+diff -Nru nvme-cli-1.5/debian/patches/series nvme-cli-1.5/debian/patches/series
+--- nvme-cli-1.5/debian/patches/series	2021-11-24 12:37:26.000000000 +0000
++++ nvme-cli-1.5/debian/patches/series	2024-09-13 05:33:22.000000000 +0000
+@@ -1,2 +1,3 @@
+ Add-support-for-Micron-plugin.patch
+ Fix-bash-completion.patch
++lp2080584-0001-Avoid-using-unsupported-load-store-instruct.patch

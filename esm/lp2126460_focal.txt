@@ -1,0 +1,61 @@
+diff -Nru net-snmp-5.8+dfsg/debian/changelog net-snmp-5.8+dfsg/debian/changelog
+--- net-snmp-5.8+dfsg/debian/changelog	2023-07-29 08:42:56.000000000 +1200
++++ net-snmp-5.8+dfsg/debian/changelog	2025-05-25 20:31:40.000000000 +1200
+@@ -1,3 +1,11 @@
++net-snmp (5.8+dfsg-2ubuntu2.9+esm1) focal; urgency=medium
++
++  * Avoid logging duplicate statfs failures, just log the once and
++    never again, preventing logspam. (LP: #2126460)
++    - d/p/lp2126460-HOST-MIB-Log-statfs-failures-once.patch
++
++ -- Matthew Ruffell <matthew.ruffell@canonical.com>  Sun, 25 May 2025 20:31:40 +1200
++
+ net-snmp (5.8+dfsg-2ubuntu2.9) focal; urgency=medium
+ 
+   * Fix "double free or corruption (fasttop)" crash (LP: #2012926):
+diff -Nru net-snmp-5.8+dfsg/debian/patches/lp2126460-HOST-MIB-Log-statfs-failures-once.patch net-snmp-5.8+dfsg/debian/patches/lp2126460-HOST-MIB-Log-statfs-failures-once.patch
+--- net-snmp-5.8+dfsg/debian/patches/lp2126460-HOST-MIB-Log-statfs-failures-once.patch	1970-01-01 12:00:00.000000000 +1200
++++ net-snmp-5.8+dfsg/debian/patches/lp2126460-HOST-MIB-Log-statfs-failures-once.patch	2025-05-25 20:31:40.000000000 +1200
+@@ -0,0 +1,34 @@
++commit 5f1986c79e8b9d3d8574fc73001d6e193bed7c79
++From: Bart Van Assche <bvanassche@acm.org>
++Date: Sat, 11 Apr 2020 20:11:35 -0700
++Subject: HOST-MIB: Log statfs() failures once
++ See also https://github.com/net-snmp/net-snmp/issues/94.
++Bug-Ubuntu: https://bugs.launchpad.net/bugs/2126460
++Bug-Ubuntu-Pro: https://bugs.launchpad.net/bugs/2126461i
++Bug-Security-ESM: https://warthogs.atlassian.net/browse/SEC-7543
++Bug: https://github.com/net-snmp/net-snmp/issues/94
++Origin: backport, https://github.com/net-snmp/net-snmp/commit/5f1986c79e8b9d3d8574fc73001d6e193bed7c79
++Last-Update: 2025-05-25
++
++Index: net-snmp-5.8+dfsg/agent/mibgroup/hardware/fsys/fsys_mntent.c
++===================================================================
++--- net-snmp-5.8+dfsg.orig/agent/mibgroup/hardware/fsys/fsys_mntent.c	2025-05-25 20:30:31.003106577 +1200
+++++ net-snmp-5.8+dfsg/agent/mibgroup/hardware/fsys/fsys_mntent.c	2025-05-25 20:30:31.001106133 +1200
++@@ -256,10 +256,14 @@
++         if ( NSFS_STATFS( entry->path, &stat_buf ) < 0 )
++ #endif
++         {
++-            tmpbuf = NULL;
++-            if (asprintf(&tmpbuf, "Cannot statfs %s", entry->path) >= 0)
+++            static char logged = 0;
+++
+++            if (!logged &&
+++                asprintf(&tmpbuf, "Cannot statfs %s", entry->path) >= 0) {
++                 snmp_log_perror(tmpbuf);
++-            free(tmpbuf);
+++                free(tmpbuf);
+++                logged = 1;
+++            }
++             entry->units = stat_buf.NSFS_SIZE;
++             entry->size  = 0;
++             entry->used  = 0;
+diff -Nru net-snmp-5.8+dfsg/debian/patches/series net-snmp-5.8+dfsg/debian/patches/series
+--- net-snmp-5.8+dfsg/debian/patches/series	2023-07-29 08:42:56.000000000 +1200
++++ net-snmp-5.8+dfsg/debian/patches/series	2025-05-25 20:31:40.000000000 +1200
+@@ -59,3 +59,4 @@
+ double-free-when-NETSNMP_CALLBACK_OP_RESEND-is-set.patch
+ remove-request-when-sending-failed-1.patch
+ remove-request-when-sending-failed-2.patch
++lp2126460-HOST-MIB-Log-statfs-failures-once.patch
