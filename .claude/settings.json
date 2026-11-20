@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import distro_info; help\\(distro_info.UbuntuDistroInfo\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(pip show *)",
+      "Bash(pip3 show *)",
+      "Bash(python3 -c \"import distro_info; print\\(distro_info.__file__\\)\")",
+      "Bash(python3 -c \"from sru_lint.common.distro_helper import get_esm_only_releases; print\\(get_esm_only_releases\\(\\)\\)\")",
+      "Bash(python3 -m pytest tests/test_distro_helper.py -v)",
+      "Bash(python3 -m unittest tests.test_distro_helper -v)",
+      "Bash(poetry run *)",
+      "Bash(echo \"check=$?\")",
+      "Bash(echo \"fmt=$?\")",
+      "Bash(git -C /home/dgd/devel/sru-lint reflog --date=relative -30)",
+      "Bash(git -C /home/dgd/devel/sru-lint status --short)",
+      "Bash(git -C /home/dgd/devel/sru-lint branch -a)",
+      "Bash(git -C /home/dgd/devel/sru-lint log --oneline -5 origin/esm-support)",
+      "Bash(git -C /home/dgd/devel/sru-lint rev-parse esm-support)",
+      "Bash(git -C /home/dgd/devel/sru-lint log --oneline -1 dbae148)",
+      "Bash(poetry install *)",
+      "Bash(poetry env *)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('/home/dgd/devel/sru-lint/sru_lint/_check_all.py'\\).read\\(\\)\\); print\\('ok'\\)\")",
+      "Bash(make spelling *)",
+      "Bash(grep -onE '\\\\b[a-z]{8,}\\\\b' docs/user-docs/install.rst docs/user-docs/usage.rst)",
+      "Bash(awk -F: '{print $3}')"
+    ]
+  }
+}
